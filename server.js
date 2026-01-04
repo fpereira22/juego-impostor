@@ -13,6 +13,8 @@ let estadoJuego = {
     votos: {},
     jugadoresListos: []
 };
+let disconnectTimeouts = {}; // Timeouts de desconexión
+let jugadoresUsadosRecientes = []; // Historial de últimos jugadores usados
 
 app.use(express.static('public'));
 
@@ -20,7 +22,27 @@ function obtenerJugadorAleatorio() {
     try {
         const data = fs.readFileSync('./jugadores.json', 'utf8');
         const jugadores = JSON.parse(data);
-        return jugadores[Math.floor(Math.random() * jugadores.length)];
+
+        // Filtrar jugadores que no se hayan usado recientemente
+        let disponibles = jugadores.filter(j => !jugadoresUsadosRecientes.includes(j));
+
+        // Si todos fueron usados, resetear el historial pero mantener el último
+        if (disponibles.length === 0) {
+            const ultimo = jugadoresUsadosRecientes[jugadoresUsadosRecientes.length - 1];
+            jugadoresUsadosRecientes = [ultimo];
+            disponibles = jugadores.filter(j => j !== ultimo);
+        }
+
+        // Seleccionar uno aleatorio de los disponibles
+        const seleccionado = disponibles[Math.floor(Math.random() * disponibles.length)];
+
+        // Agregar al historial (mantener últimos 10)
+        jugadoresUsadosRecientes.push(seleccionado);
+        if (jugadoresUsadosRecientes.length > 10) {
+            jugadoresUsadosRecientes.shift();
+        }
+
+        return seleccionado;
     } catch (err) {
         return "Desconocido";
     }
@@ -35,11 +57,26 @@ io.on('connection', (socket) => {
     socket.on('join', (nombre) => {
         console.log(`${nombre} se unió con ID: ${socket.id}`);
 
-        // Verificar si ya existe (evitar duplicados)
-        const existente = usuarios.find(u => u.id === socket.id);
-        if (!existente) {
-            // Al entrar, el jugador siempre empieza vivo
-            usuarios.push({ id: socket.id, nombre, vivo: true });
+        // Cancelar timeout de desconexión si existe (reconexión)
+        if (disconnectTimeouts[socket.id]) {
+            clearTimeout(disconnectTimeouts[socket.id]);
+            delete disconnectTimeouts[socket.id];
+            console.log(`Timeout de desconexión cancelado para ${nombre}`);
+        }
+
+        // Buscar si el usuario existe por nombre (reconexión con nuevo ID)
+        const existentePorNombre = usuarios.find(u => u.nombre === nombre);
+        if (existentePorNombre && existentePorNombre.id !== socket.id) {
+            // Actualizar el ID del usuario existente
+            console.log(`Reconexión detectada: ${nombre} cambió de ${existentePorNombre.id} a ${socket.id}`);
+            existentePorNombre.id = socket.id;
+        } else {
+            // Verificar si ya existe por ID
+            const existentePorId = usuarios.find(u => u.id === socket.id);
+            if (!existentePorId) {
+                // Al entrar, el jugador siempre empieza vivo
+                usuarios.push({ id: socket.id, nombre, vivo: true });
+            }
         }
 
         // Enviar la lista actualizada a TODOS los clientes
@@ -174,10 +211,20 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         const usuario = usuarios.find(u => u.id === socket.id);
-        console.log(`Cliente desconectado: ${socket.id} ${usuario ? `(${usuario.nombre})` : ''}`);
-        usuarios = usuarios.filter(u => u.id !== socket.id);
-        io.emit('update-users', usuarios);
-        console.log(`Total usuarios después de desconexión: ${usuarios.length}`);
+        console.log(`Cliente desconectado: ${socket.id} ${usuario ? `(${usuario.nombre})` : ''} - Esperando 15 segundos...`);
+
+        // Crear un timeout de 15 segundos antes de eliminar al usuario
+        disconnectTimeouts[socket.id] = setTimeout(() => {
+            // Verificar si el usuario sigue desconectado
+            const usuarioActual = usuarios.find(u => u.id === socket.id);
+            if (usuarioActual) {
+                console.log(`Usuario ${usuarioActual.nombre} no se reconectó. Eliminando...`);
+                usuarios = usuarios.filter(u => u.id !== socket.id);
+                io.emit('update-users', usuarios);
+                console.log(`Total usuarios después de desconexión: ${usuarios.length}`);
+            }
+            delete disconnectTimeouts[socket.id];
+        }, 15000); // 15 segundos
     });
 });
 
