@@ -132,7 +132,18 @@ io.on('connection', (socket) => {
         usuarios.forEach(u => u.vivo = true);
 
         const vivos = usuarios.filter(u => u.vivo);
-        const impostorIndex = Math.floor(Math.random() * vivos.length);
+
+        let impostorIndex;
+        let intentos = 0;
+        const ultimoImpostorId = estadoJuego.impostorId; // Guardar el ID del impostor anterior
+
+        // Intentar elegir un impostor diferente al anterior (si hay suficientes jugadores)
+        do {
+            impostorIndex = Math.floor(Math.random() * vivos.length);
+            intentos++;
+            // Si hay más de 3 jugadores, forzar cambio. Si son 3, aceptar repetición después de 3 intentos
+        } while (vivos.length > 3 && vivos[impostorIndex].id === ultimoImpostorId && intentos < 10);
+
         estadoJuego.impostorId = vivos[impostorIndex].id;
 
         usuarios.forEach((u) => {
