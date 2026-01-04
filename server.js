@@ -11,7 +11,8 @@ let estadoJuego = {
     jugadorSecreto: "",
     impostorId: "",
     votos: {},
-    jugadoresListos: []
+    jugadoresListos: [],
+    partidaActiva: false // Trackear si hay una partida en curso
 };
 let disconnectTimeouts = {}; // Timeouts de desconexión
 let jugadoresUsadosRecientes = []; // Historial de últimos jugadores usados
@@ -70,6 +71,20 @@ io.on('connection', (socket) => {
             // Actualizar el ID del usuario existente
             console.log(`Reconexión detectada: ${nombre} cambió de ${existentePorNombre.id} a ${socket.id}`);
             existentePorNombre.id = socket.id;
+
+            // Si hay una partida activa, reenviar el rol
+            if (estadoJuego.partidaActiva) {
+                console.log(`Reenviando rol a ${nombre} (partida activa)`);
+                if (existentePorNombre.id === estadoJuego.impostorId) {
+                    io.to(socket.id).emit('role-assigned', { role: 'impostor', reconexion: true });
+                } else {
+                    io.to(socket.id).emit('role-assigned', {
+                        role: 'legit',
+                        data: estadoJuego.jugadorSecreto,
+                        reconexion: true
+                    });
+                }
+            }
         } else {
             // Verificar si ya existe por ID
             const existentePorId = usuarios.find(u => u.id === socket.id);
@@ -90,6 +105,7 @@ io.on('connection', (socket) => {
         estadoJuego.jugadorSecreto = obtenerJugadorAleatorio();
         estadoJuego.votos = {};
         estadoJuego.jugadoresListos = []; // Resetear jugadores listos
+        estadoJuego.partidaActiva = true; // Marcar que hay partida en curso
 
         // Resetear salud de todos al iniciar
         usuarios.forEach(u => u.vivo = true);
@@ -187,6 +203,7 @@ io.on('connection', (socket) => {
 
             if (finDelJuego) {
                 // Si el juego termina, reseteamos a todos a 'vivo' para el lobby
+                estadoJuego.partidaActiva = false; // Marcar que la partida terminó
                 usuarios.forEach(u => u.vivo = true);
             } else {
                 // El juego continúa con la misma palabra secreta
