@@ -273,7 +273,13 @@
     </div>
 
     <script>
-        const socket = io();
+        const socket = io({
+            reconnection: true,
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 2000,
+            reconnectionAttempts: Infinity
+        });
+
         const mainUI = document.getElementById('main-ui');
         const revealScreen = document.getElementById('reveal-screen');
         const eliminationScreen = document.getElementById('elimination-screen');
@@ -283,10 +289,35 @@
         const gameOverSection = document.getElementById('game-over-section');
 
         let estoyVivo = true; // Trackear si este jugador está vivo
+        let miNombre = localStorage.getItem('impostorNombre') || '';
+        let enLobby = false;
+
+        // Auto-login si ya tiene nombre guardado
+        if (miNombre) {
+            document.getElementById('username').value = miNombre;
+        }
+
+        // Manejar reconexión
+        socket.on('connect', () => {
+            console.log('Conectado al servidor');
+            // Si ya tenía un nombre y estaba en el lobby, reconectarse automáticamente
+            if (miNombre && enLobby) {
+                socket.emit('join', miNombre);
+                loginSection.style.display = 'none';
+                lobbySection.style.display = 'block';
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Desconectado del servidor, intentando reconectar...');
+        });
 
         document.getElementById('btn-entrar').onclick = () => {
             const name = document.getElementById('username').value;
             if (name.trim() !== "") {
+                miNombre = name;
+                localStorage.setItem('impostorNombre', name);
+                enLobby = true;
                 socket.emit('join', name);
                 loginSection.style.display = 'none';
                 lobbySection.style.display = 'block';
@@ -300,6 +331,7 @@
         document.getElementById('btn-play-again').onclick = () => {
             // Resetear estado del juego
             estoyVivo = true;
+            enLobby = true; // Mantener estado de lobby activo
 
             // Ocultar todas las secciones
             loginSection.style.display = 'none';
