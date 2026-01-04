@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impostor Futbolero ⚽</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@400;600;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00d1b2;
+            --danger: #ff3860;
+            --dark: #0a0a0a;
+            --card-bg: #1a1a1a;
+            --text-gray: #b5b5b5;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--dark);
+            color: white;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 450px;
+        }
+
+        h1 {
+            font-family: 'Bebas Neue', cursive;
+            font-size: 4.5rem;
+            margin: 0 0 10px 0;
+            letter-spacing: 3px;
+        }
+
+        .box {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 25px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+            border: 1px solid #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            margin-bottom: 20px;
+            background: #2a2a2a;
+            color: white;
+            font-size: 1.1rem;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--primary);
+            color: var(--dark);
+            border: none;
+            padding: 15px 35px;
+            border-radius: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 1rem;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            filter: brightness(1.1);
+        }
+
+        button:disabled {
+            background: #555;
+            color: #999;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
+        .user-list {
+            margin: 20px 0;
+            background: #111;
+            border-radius: 15px;
+            padding: 15px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .user-item {
+            padding: 10px;
+            border-bottom: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #reveal-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--dark);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .player-display {
+            font-family: 'Bebas Neue';
+            font-size: 4rem;
+            line-height: 1;
+            margin: 20px 0;
+        }
+
+        .impostor-text {
+            color: var(--danger);
+        }
+
+        .legit-text {
+            color: var(--primary);
+        }
+
+        .secondary-btn {
+            background: #333;
+            color: white;
+            width: auto;
+            margin-top: 20px;
+        }
+
+        #elimination-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .elimination-content {
+            text-align: center;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .elimination-title {
+            font-family: 'Bebas Neue';
+            font-size: 3rem;
+            margin-bottom: 20px;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .elimination-name {
+            font-family: 'Bebas Neue';
+            font-size: 5rem;
+            margin: 30px 0;
+            line-height: 1;
+        }
+
+        .elimination-status {
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container" id="main-ui">
+        <h1>IMPOSTOR</h1>
+
+        <div id="login-section" class="box">
+            <p style="color: var(--text-gray);">¡Wena! Pon tu nombre pa' empezar</p>
+            <input type="text" id="username" placeholder="Tu apodo acá..." autocomplete="off">
+            <button id="btn-entrar">Ponerse la camiseta</button>
+        </div>
+
+        <div id="lobby-section" class="box" style="display: none;">
+            <h3 style="margin-top:0">Los cabros conectados:</h3>
+            <div id="user-list" class="user-list"></div>
+            <p id="wait-msg" style="font-size: 0.9rem; color: #777;">Faltan jugadores...</p>
+            <button id="start-btn" style="display: none;">¡DALE ARRANQUE!</button>
+        </div>
+
+        <div id="voting-section" class="box" style="display: none;">
+            <h2 style="color: var(--danger); font-family: 'Bebas Neue'; font-size: 2.5rem;">¿A QUIÉN ECHAMOS?</h2>
+            <div id="voting-candidates"></div>
+        </div>
+
+        <div id="game-over-section" class="box" style="display: none;">
+            <h1 id="victory-title" style="font-size: 3rem;"></h1>
+            <div id="impostor-reveal" style="display: none; margin: 20px 0;">
+                <p style="font-size: 1.5rem; margin-bottom: 10px;">El impostor era:</p>
+                <h2 id="impostor-name"
+                    style="font-family: 'Bebas Neue'; font-size: 3rem; color: var(--danger); margin: 10px 0;"></h2>
+                <img src="https://media.tenor.com/0glC3gFx0G4AAAAM/davopuerro.gif"
+                    style="max-width: 300px; border-radius: 15px; margin: 20px auto; display: block;" alt="Impostor">
+            </div>
+            <p id="victory-msg" style="font-size: 1.2rem; margin-bottom: 30px;"></p>
+            <button id="btn-play-again">Jugar otra vez</button>
+        </div>
+    </div>
+
+    <div id="reveal-screen">
+        <p>TU PALABRA ES:</p>
+        <h1 id="player-display" class="player-display"></h1>
+        <button class="secondary-btn" id="btn-ir-votar">IR A VOTACIÓN</button>
+    </div>
+
+    <div id="elimination-screen">
+        <div class="elimination-content">
+            <h2 id="elimination-title" class="elimination-title"></h2>
+            <h1 id="elimination-name" class="elimination-name"></h1>
+            <p id="elimination-status" class="elimination-status"></p>
+            <button class="secondary-btn" id="btn-continue">CONTINUAR</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const mainUI = document.getElementById('main-ui');
+        const revealScreen = document.getElementById('reveal-screen');
+        const eliminationScreen = document.getElementById('elimination-screen');
+        const loginSection = document.getElementById('login-section');
+        const lobbySection = document.getElementById('lobby-section');
+        const votingSection = document.getElementById('voting-section');
+        const gameOverSection = document.getElementById('game-over-section');
+
+        let estoyVivo = true; // Trackear si este jugador está vivo
+
+        document.getElementById('btn-entrar').onclick = () => {
+            const name = document.getElementById('username').value;
+            if (name.trim() !== "") {
+                socket.emit('join', name);
+                loginSection.style.display = 'none';
+                lobbySection.style.display = 'block';
+            }
+        };
+
+        document.getElementById('start-btn').onclick = () => socket.emit('start-game');
+        document.getElementById('btn-ir-votar').onclick = () => socket.emit('open-voting');
+
+        // Función para volver al lobby sin recargar
+        document.getElementById('btn-play-again').onclick = () => {
+            // Resetear estado del juego
+            estoyVivo = true;
+
+            // Ocultar todas las secciones
+            loginSection.style.display = 'none';
+            gameOverSection.style.display = 'none';
+            votingSection.style.display = 'none';
+            revealScreen.style.display = 'none';
+            eliminationScreen.style.display = 'none';
+
+            // Mostrar el lobby
+            mainUI.style.display = 'block';
+            lobbySection.style.display = 'block';
+
+            // Resetear el botón de votar al estado original
+            const btnVotar = document.getElementById('btn-ir-votar');
+            btnVotar.onclick = () => socket.emit('open-voting');
+            btnVotar.disabled = false;
+            btnVotar.innerText = 'IR A VOTACIÓN';
+
+            // Resetear la pantalla de revelación para limpiar estilos anteriores
+            const display = document.getElementById('player-display');
+            display.innerText = '';
+            display.className = 'player-display';
+            display.style.color = '';
+        };
+
+        socket.on('update-users', (users) => {
+            const list = document.getElementById('user-list');
+            list.innerHTML = users.map(u => `
+                <div class="user-item">
+                    <span>⚽ ${u.nombre}</span> 
+                    <span style="font-weight:bold; font-size:0.7rem; color:${u.vivo ? 'var(--primary)' : 'var(--danger)'}">
+                        ${u.vivo ? 'CONECTADO' : 'ELIMINADO'}
+                    </span>
+                </div>
+            `).join('');
+
+            const btnStart = document.getElementById('start-btn');
+            const msg = document.getElementById('wait-msg');
+            if (users.length >= 3) {
+                btnStart.style.display = 'block';
+                msg.style.display = 'none';
+            } else {
+                btnStart.style.display = 'none';
+                msg.style.display = 'block';
+                msg.innerText = `Faltan ${3 - users.length} más...`;
+            }
+        });
+
+        socket.on('role-assigned', (info) => {
+            estoyVivo = true; // Resetear estado al iniciar juego
+            mainUI.style.display = 'none';
+            revealScreen.style.display = 'flex';
+            const display = document.getElementById('player-display');
+            const btnVotar = document.getElementById('btn-ir-votar');
+
+            // Resetear el botón por si quedó deshabilitado
+            btnVotar.disabled = false;
+            btnVotar.innerText = 'IR A VOTACIÓN';
+
+            if (info.role === 'impostor') {
+                display.innerText = "¡ERES EL IMPOSTOR!";
+                display.className = "player-display impostor-text";
+            } else {
+                display.innerText = info.data.toUpperCase();
+                display.className = "player-display legit-text";
+            }
+        });
+
+        socket.on('waiting-for-others', (info) => {
+            const btnVotar = document.getElementById('btn-ir-votar');
+            btnVotar.disabled = true;
+            btnVotar.innerText = `Esperando... (${info.ready}/${info.total})`;
+        });
+
+        socket.on('voting-started', (vivos) => {
+            revealScreen.style.display = 'none';
+            mainUI.style.display = 'block';
+            lobbySection.style.display = 'none';
+            votingSection.style.display = 'block';
+
+            const container = document.getElementById('voting-candidates');
+            container.innerHTML = ""; // Limpiar antes de llenar
+
+            if (!estoyVivo) {
+                // Si estoy muerto, solo mostrar mensaje de espectador
+                container.innerHTML = `
+                    <div style="padding: 20px; background: rgba(255,56,96,0.1); border-radius: 15px; border: 2px solid var(--danger);">
+                        <h3 style="color: var(--danger); margin-top: 0;">❌ FUISTE ELIMINADO</h3>
+                        <p style="color: var(--text-gray);">Estás viendo la votación como espectador.</p>
+                        <p style="color: var(--text-gray); font-size: 0.9rem;">Los jugadores vivos están votando...</p>
+                    </div>
+                `;
+                return;
+            }
+
+            vivos.forEach(u => {
+                const btn = document.createElement('button');
+                btn.innerText = u.nombre.toUpperCase();
+                btn.onclick = () => {
+                    socket.emit('cast-vote', u.id);
+                    container.innerHTML = "<h3>Voto enviado. Esperando al resto...</h3>";
+                };
+                container.appendChild(btn);
+            });
+        });
+
+        socket.on('elimination-result', (res) => {
+            const fuiYoEliminado = res.eliminadoId === socket.id;
+
+            // Si fui yo el eliminado, mostrar pantalla completa
+            if (fuiYoEliminado && !res.finDelJuego) {
+                // MARCAR COMO MUERTO INMEDIATAMENTE
+                estoyVivo = false;
+
+                votingSection.style.display = 'none';
+                mainUI.style.display = 'none';
+                eliminationScreen.style.display = 'flex';
+
+                const elimTitle = document.getElementById('elimination-title');
+                const elimName = document.getElementById('elimination-name');
+                const elimStatus = document.getElementById('elimination-status');
+
+                elimTitle.innerText = "¡FUISTE ELIMINADO!";
+                elimTitle.style.color = "var(--danger)";
+                elimName.innerText = res.nombre.toUpperCase();
+                elimName.style.color = "var(--danger)";
+                elimStatus.innerText = "No eras el impostor... Ahora eres espectador.";
+
+                document.getElementById('btn-continue').onclick = () => {
+                    eliminationScreen.style.display = 'none';
+                    // Esperar evento spectator-mode del servidor
+                };
+            }
+            // Si el juego terminó, todos ven el resultado
+            else if (res.finDelJuego) {
+                votingSection.style.display = 'none';
+                mainUI.style.display = 'none';
+                eliminationScreen.style.display = 'flex';
+
+                const elimTitle = document.getElementById('elimination-title');
+                const elimName = document.getElementById('elimination-name');
+                const elimStatus = document.getElementById('elimination-status');
+
+                elimTitle.innerText = "¡ELIMINADO!";
+                elimTitle.style.color = res.esImpostor ? "var(--primary)" : "var(--danger)";
+                elimName.innerText = res.nombre.toUpperCase();
+                elimName.style.color = res.esImpostor ? "var(--primary)" : "var(--danger)";
+                elimStatus.innerText = res.esImpostor ? "¡ERA EL IMPOSTOR! GANARON LOS CABROS 🎉" : "Era inocente... ¡Ganó el impostor! 😈";
+
+                document.getElementById('btn-continue').onclick = () => {
+                    eliminationScreen.style.display = 'none';
+                    mainUI.style.display = 'block';
+                    gameOverSection.style.display = 'block';
+                    const title = document.getElementById('victory-title');
+                    title.innerText = res.ganador === "CABROS" ? "¡GANARON LOS CABROS!" : "¡GANÓ EL IMPOSTOR!";
+                    title.style.color = res.ganador === "CABROS" ? "var(--primary)" : "var(--danger)";
+                    document.getElementById('victory-msg').innerText = res.esImpostor ? "¡Descubrieron al impostor!" : "El impostor los engañó a todos...";
+
+                    // Si ganó el impostor, mostrar quién era con el GIF
+                    const impostorReveal = document.getElementById('impostor-reveal');
+                    if (res.ganador === "IMPOSTOR") {
+                        impostorReveal.style.display = 'block';
+                        document.getElementById('impostor-name').innerText = res.nombreImpostor.toUpperCase();
+                    } else {
+                        impostorReveal.style.display = 'none';
+                    }
+                };
+            }
+            // Si no fui yo y el juego continúa, no hago nada (espero new-round)
+        });
+
+        socket.on('spectator-mode', () => {
+            // El jugador eliminado entra en modo espectador
+            eliminationScreen.style.display = 'none';
+            mainUI.style.display = 'none';
+            revealScreen.style.display = 'flex';
+
+            const display = document.getElementById('player-display');
+            const btnVotar = document.getElementById('btn-ir-votar');
+
+            display.innerText = "ESTÁS ELIMINADO";
+            display.className = "player-display";
+            display.style.color = "var(--danger)";
+
+            btnVotar.innerText = 'VER VOTACIÓN';
+            btnVotar.disabled = false;
+
+            // Cuando presiona el botón, mostrar mensaje gracioso
+            btnVotar.onclick = () => {
+                display.innerText = "¡BUENAAA, ESTÁS ELIMINADO!";
+                setTimeout(() => {
+                    display.innerText = "NO PUEDES VOTAR 😂";
+                }, 1000);
+                setTimeout(() => {
+                    display.innerText = "ESTÁS ELIMINADO";
+                }, 2500);
+            };
+        });
+
+        socket.on('new-round', (info) => {
+            // Nueva ronda, mostrar la nueva palabra
+            mainUI.style.display = 'none';
+            revealScreen.style.display = 'flex';
+            const display = document.getElementById('player-display');
+            const btnVotar = document.getElementById('btn-ir-votar');
+
+            // Resetear el botón
+            btnVotar.disabled = false;
+            btnVotar.innerText = 'IR A VOTACIÓN';
+
+            if (info.role === 'impostor') {
+                display.innerText = "¡ERES EL IMPOSTOR!";
+                display.className = "player-display impostor-text";
+            } else {
+                display.innerText = info.data.toUpperCase();
+                display.className = "player-display legit-text";
+            }
+        });
+    </script>
+</body>
+
+</html>
