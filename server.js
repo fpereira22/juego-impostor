@@ -27,10 +27,24 @@ function obtenerJugadorAleatorio() {
 }
 
 io.on('connection', (socket) => {
+    console.log(`Cliente conectado: ${socket.id}`);
+
+    // Enviar la lista actual de usuarios al cliente que se acaba de conectar
+    socket.emit('update-users', usuarios);
+
     socket.on('join', (nombre) => {
-        // Al entrar, el jugador siempre empieza vivo
-        usuarios.push({ id: socket.id, nombre, vivo: true });
+        console.log(`${nombre} se unió con ID: ${socket.id}`);
+
+        // Verificar si ya existe (evitar duplicados)
+        const existente = usuarios.find(u => u.id === socket.id);
+        if (!existente) {
+            // Al entrar, el jugador siempre empieza vivo
+            usuarios.push({ id: socket.id, nombre, vivo: true });
+        }
+
+        // Enviar la lista actualizada a TODOS los clientes
         io.emit('update-users', usuarios);
+        console.log(`Total usuarios: ${usuarios.length}`);
     });
 
     socket.on('start-game', () => {
@@ -159,8 +173,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        const usuario = usuarios.find(u => u.id === socket.id);
+        console.log(`Cliente desconectado: ${socket.id} ${usuario ? `(${usuario.nombre})` : ''}`);
         usuarios = usuarios.filter(u => u.id !== socket.id);
         io.emit('update-users', usuarios);
+        console.log(`Total usuarios después de desconexión: ${usuarios.length}`);
     });
 });
 
