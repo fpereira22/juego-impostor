@@ -164,16 +164,19 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, '0.0.0.0', () => {
+
+server.listen(process.env.PORT || 3000, '0.0.0.0', () => {
     const os = require('os');
     const interfaces = os.networkInterfaces();
+    const port = process.env.PORT || 3000;
     console.log('Servidor corriendo en:');
-    console.log('  - Local: http://localhost:3000');
+    console.log(`  - Puerto: ${port}`);
+    console.log(`  - Local: http://localhost:${port}`);
 
     Object.keys(interfaces).forEach((interfaceName) => {
         interfaces[interfaceName].forEach((iface) => {
             if (iface.family === 'IPv4' && !iface.internal) {
-                console.log(`  - Red: http://${iface.address}:3000`);
+                console.log(`  - Red: http://${iface.address}:${port}`);
             }
         });
     });
