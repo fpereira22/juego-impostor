@@ -69,13 +69,34 @@ io.on('connection', (socket) => {
         const existentePorNombre = usuarios.find(u => u.nombre === nombre);
         if (existentePorNombre && existentePorNombre.id !== socket.id) {
             // Actualizar el ID del usuario existente
-            console.log(`Reconexión detectada: ${nombre} cambió de ${existentePorNombre.id} a ${socket.id}`);
+            const oldId = existentePorNombre.id;
+            console.log(`Reconexión detectada: ${nombre} cambió de ${oldId} a ${socket.id}`);
+
+            // 1. Actualizar ID en el objeto usuario
             existentePorNombre.id = socket.id;
 
-            // Si hay una partida activa, reenviar el rol
             if (estadoJuego.partidaActiva) {
+                // 2. Si era el impostor, actualizar la referencia del impostorId
+                if (estadoJuego.impostorId === oldId) {
+                    estadoJuego.impostorId = socket.id;
+                    console.log(`Impostor ID actualizado a: ${socket.id}`);
+                }
+
+                // 3. Migrar votos recibidos (si alguien votó por él con el ID viejo)
+                if (estadoJuego.votos[oldId]) {
+                    estadoJuego.votos[socket.id] = estadoJuego.votos[oldId];
+                    delete estadoJuego.votos[oldId];
+                    console.log(`Votos migrados de ${oldId} a ${socket.id}`);
+                }
+
+                // 4. Actualizar lista de jugadores listos
+                const readyIndex = estadoJuego.jugadoresListos.indexOf(oldId);
+                if (readyIndex !== -1) {
+                    estadoJuego.jugadoresListos[readyIndex] = socket.id;
+                }
+
                 console.log(`Reenviando rol a ${nombre} (partida activa)`);
-                if (existentePorNombre.id === estadoJuego.impostorId) {
+                if (socket.id === estadoJuego.impostorId) {
                     io.to(socket.id).emit('role-assigned', { role: 'impostor', reconexion: true });
                 } else {
                     io.to(socket.id).emit('role-assigned', {
